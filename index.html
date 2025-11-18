@@ -64,6 +64,11 @@
             background-repeat: no-repeat;
             background-position: center;
             transition: all 0.3s ease;
+            position: relative;
+        }
+
+        #cat-sprite.drag-over {
+            filter: brightness(1.1);
         }
 
         #input-container {
@@ -160,6 +165,17 @@
             pointer-events: none;
         }
 
+        .cat-ingredient {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            pointer-events: none;
+            z-index: 100;
+        }
+
         #final-message {
             position: absolute;
             top: 50%;
@@ -226,6 +242,7 @@
         let currentOrder = {};
         let currentPhase = 'ordering'; // ordering, protein, vegetable, sauce
         let selectedIngredient = null;
+        let catIngredientsCount = 0; // Track number of ingredients on cat face
 
         // Game Data
         const proteins = ['beef', 'pork', 'chicken'];
@@ -275,6 +292,7 @@
             currentRound++;
             correctnessValue = 0;
             currentPhase = 'ordering';
+            catIngredientsCount = 0; // Reset cat ingredients counter
 
             // Reset UI
             speechBubble.style.display = 'none';
@@ -285,6 +303,7 @@
 
             // Clear any placed ingredients
             document.querySelectorAll('.placed-ingredient').forEach(el => el.remove());
+            document.querySelectorAll('.cat-ingredient').forEach(el => el.remove());
 
             // Generate random order
             currentOrder = {
@@ -392,48 +411,105 @@
             tortilla.classList.remove('drag-over');
 
             if (selectedIngredient) {
-                handleIngredientSelection(selectedIngredient);
+                handleIngredientSelection(selectedIngredient, 'tortilla');
             }
         });
 
-        function handleIngredientSelection(ingredient) {
-            // Check if correct
-            const isCorrect = ingredient === currentOrder[currentPhase];
+        // Cat sprite drag and drop handlers
+        catSprite.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            catSprite.classList.add('drag-over');
+        });
 
-            if (isCorrect) {
-                correctnessValue++;
-            } else {
-                correctnessValue--;
+        catSprite.addEventListener('dragleave', () => {
+            catSprite.classList.remove('drag-over');
+        });
+
+        catSprite.addEventListener('drop', (e) => {
+            e.preventDefault();
+            catSprite.classList.remove('drag-over');
+
+            if (selectedIngredient) {
+                handleIngredientSelection(selectedIngredient, 'cat');
             }
+        });
 
-            // Clamp between -2 and 2
-            correctnessValue = Math.max(-2, Math.min(2, correctnessValue));
+        function handleIngredientSelection(ingredient, target) {
+            if (target === 'cat') {
+                // Place ingredient on cat face - always deduct 1 from correctness
+                correctnessValue--;
+                correctnessValue = Math.max(-2, Math.min(2, correctnessValue));
+                updateCatExpression(correctnessValue);
 
-            // Update cat expression
-            updateCatExpression(correctnessValue);
+                // Place ingredient on cat's face
+                const catIngredient = document.createElement('div');
+                catIngredient.className = 'cat-ingredient';
+                catIngredient.style.backgroundImage = `url('${ingredientImages[ingredient]}')`;
 
-            // Place ingredient on tortilla
-            const placedIngredient = document.createElement('div');
-            placedIngredient.className = 'placed-ingredient';
-            placedIngredient.style.backgroundImage = `url('${ingredientImages[ingredient]}')`;
-            placedIngredient.style.bottom = '15%';
-            placedIngredient.style.left = '50%';
-            placedIngredient.style.transform = 'translateX(-50%)';
-            document.getElementById('game-container').appendChild(placedIngredient);
+                // Position above cat's face with horizontal offset to avoid full overlap
+                const catRect = catSprite.getBoundingClientRect();
+                const offsetX = (catIngredientsCount % 3) * 40 - 40; // Spread horizontally
+                const offsetY = Math.floor(catIngredientsCount / 3) * 30; // Stack vertically if needed
 
-            // Hide current ingredients
-            ingredientsContainer.style.display = 'none';
+                catIngredient.style.top = `calc(50% - 150px - ${offsetY}px)`;
+                catIngredient.style.left = `calc(50% + ${offsetX}px)`;
+                catIngredient.style.transform = 'translateX(-50%)';
 
-            // Move to next phase
-            setTimeout(() => {
-                if (currentPhase === 'protein') {
-                    startIngredientPhase('vegetable');
-                } else if (currentPhase === 'vegetable') {
-                    startIngredientPhase('sauce');
-                } else if (currentPhase === 'sauce') {
-                    finishRound();
+                document.getElementById('game-container').appendChild(catIngredient);
+                catIngredientsCount++;
+
+                // Hide current ingredients
+                ingredientsContainer.style.display = 'none';
+
+                // Move to next phase
+                setTimeout(() => {
+                    if (currentPhase === 'protein') {
+                        startIngredientPhase('vegetable');
+                    } else if (currentPhase === 'vegetable') {
+                        startIngredientPhase('sauce');
+                    } else if (currentPhase === 'sauce') {
+                        finishRound();
+                    }
+                }, 1000);
+            } else {
+                // Place ingredient on tortilla - normal behavior
+                const isCorrect = ingredient === currentOrder[currentPhase];
+
+                if (isCorrect) {
+                    correctnessValue++;
+                } else {
+                    correctnessValue--;
                 }
-            }, 1000);
+
+                // Clamp between -2 and 2
+                correctnessValue = Math.max(-2, Math.min(2, correctnessValue));
+
+                // Update cat expression
+                updateCatExpression(correctnessValue);
+
+                // Place ingredient on tortilla
+                const placedIngredient = document.createElement('div');
+                placedIngredient.className = 'placed-ingredient';
+                placedIngredient.style.backgroundImage = `url('${ingredientImages[ingredient]}')`;
+                placedIngredient.style.bottom = '15%';
+                placedIngredient.style.left = '50%';
+                placedIngredient.style.transform = 'translateX(-50%)';
+                document.getElementById('game-container').appendChild(placedIngredient);
+
+                // Hide current ingredients
+                ingredientsContainer.style.display = 'none';
+
+                // Move to next phase
+                setTimeout(() => {
+                    if (currentPhase === 'protein') {
+                        startIngredientPhase('vegetable');
+                    } else if (currentPhase === 'vegetable') {
+                        startIngredientPhase('sauce');
+                    } else if (currentPhase === 'sauce') {
+                        finishRound();
+                    }
+                }, 1000);
+            }
         }
 
         function finishRound() {
@@ -459,6 +535,9 @@
                 catSprite.classList.add('slide-out-left');
                 tortilla.classList.add('slide-out-left');
                 document.querySelectorAll('.placed-ingredient').forEach(el => {
+                    el.classList.add('slide-out-left');
+                });
+                document.querySelectorAll('.cat-ingredient').forEach(el => {
                     el.classList.add('slide-out-left');
                 });
 
